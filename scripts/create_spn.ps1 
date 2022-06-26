@@ -1,0 +1,21 @@
+Connect-AzureAD
+$appName = "AppRegistrationMonitor-ADA"
+if(!($myApp = Get-AzureADApplication -Filter "DisplayName eq '$($appName)'"  -ErrorAction SilentlyContinue))
+{
+    $myApp = New-AzureADApplication -DisplayName $appName 
+}
+
+
+
+$startDate = Get-Date
+$endDate = $startDate.AddYears(3)
+$appid=Get-AzureADApplication -Filter "DisplayName eq '$appName'" | Select -ExpandProperty AppId
+$objectid=Get-AzureADApplication -Filter "DisplayName eq '$appName'"| Select -ExpandProperty ObjectId
+$aadAppsecret01 = New-AzureADApplicationPasswordCredential -ObjectId $objectid -CustomKeyIdentifier "Secret02" -StartDate $startDate -EndDate $endDate | select -ExpandProperty Value
+az ad sp create --id $appid
+az role assignment create --assignee $appid --role "{f2ef992c-3afb-46b9-b7cf-a126ee74c451}"
+Write-Host "AppId: $appid"
+Write-Host "Secret Value: $aadAppsecret01" 
+
+
+
