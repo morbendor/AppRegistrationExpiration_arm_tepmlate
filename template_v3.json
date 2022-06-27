@@ -1,0 +1,283 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#", 
+    "contentVersion": "1.0.0.0",
+    "parameters":   {
+        "location": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().location]",
+            "metadata": {
+              "description": "Location for all resources."
+            }
+        },
+        "automationAccounts_name": {
+            "defaultValue": "AppRegistrationMonitor-mor-temp",
+            "type": "String"
+        },
+        "automationAccounts_script_name": {
+            "defaultValue": "AppRegistrationMonitor-mor-temp-script",
+            "type": "String"
+        },
+        "AppRegistrationMonitor_AppId": {
+            "defaultValue": "5e6d6a0c-c1e3-48c2-9e69-a9b1052a2cde",
+            "type": "String"
+        }, 
+        "AppRegistrationMonitor_Secret_Value": {
+            "defaultValue": "gbs8Q~AJNUF4~iaxugUWkUqlW2~bECS.EbCIKa5_",
+            "type": "String"
+        },
+        "LogAnalyticsPrimaryKey": {
+            "defaultValue": "9h0HCDs0xUTvqR6tnsOmnp9NFR1rv/fovJ2zpn4FCb/m/5xR1Vod2/O/9hvUusdTTB7LgRoaeONsHVwpAy9niw==",
+            "type": "String"
+        },
+        "LogAnalyticsWorkspaceID": {
+            "defaultValue": "5f83b0bc-148a-4e0a-876a-79dba2c553b5",
+            "type": "String"
+        },
+        "MonitoredTenantID": {
+            "defaultValue": "a83e4e63-bd59-4a9a-83fe-6c0b18d16817",
+            "type": "String"
+        },
+        "ingestScheduleGuid": {
+         "defaultValue":"8abdb1cb-d20d-463d-88f1-49e95099c978",
+          "type": "string",
+          "metadata": {
+            "description": "GUID for the schedule creation - create a unique before deploy"
+        }
+        },
+        "psModulesUri": {
+            "type": "string",
+            "defaultValue": "https://devopsgallerystorage.blob.core.windows.net/packages/",
+            "metadata": {
+                "description": "Default modules URI"
+        }
+        }  
+    },
+    "variables": {
+      "runbookUri": "https://raw.githubusercontent.com/morbendor/AppRegistrationExpiration_arm_tepmlate/main/scripts/Get-AppRegistrationExpiration.ps1",
+      "ingestScheduleName": "IngestAPISchedule",
+      "psModules": {
+        "az.accounts": {
+        "name": "Az.Accounts",
+        "url": "[uri(parameters('psModulesUri'),'az.accounts.2.8.0.nupkg')]"
+        },
+        "az.resources": {
+        "name": "Az.Resources",
+        "url": "[uri(parameters('psModulesUri'),'az.resources.6.0.0.nupkg')]"
+        }
+      },
+     "runbooks": {
+       "omsASRMonitoring": {
+         "name": "AppRegistrationMonitor-mor-temp",
+         "version": "1.0.0.0",
+         "description": "Runbook to automatically ingest Recovery Services data and events into OMS Log Analytics",
+         "type": "PowerShell"
+      }
+    }
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Automation/automationAccounts",
+            "apiVersion": "2021-06-22",
+            "name": "[parameters('automationAccounts_name')]",
+            "location": "[parameters('location')]",
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "publicNetworkAccess": true,
+                "disableLocalAuth": false,
+                "sku": {
+                    "name": "Basic"
+                },
+                "encryption": {
+                    "keySource": "Microsoft.Automation",
+                    "identity": {}
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Automation/automationAccounts/connectionTypes",
+            "apiVersion": "2020-01-13-preview",
+            "name": "[concat(parameters('automationAccounts_name'), '/Azure')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccounts_name'))]"
+            ],
+            "properties": {
+                "isGlobal": true,
+                "fieldDefinitions": {
+                    "AutomationCertificateName": {
+                        "isEncrypted": false,
+                        "isOptional": false,
+                        "type": "System.String"
+                    },
+                    "SubscriptionID": {
+                        "isEncrypted": false,
+                        "isOptional": false,
+                        "type": "System.String"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Automation/automationAccounts/connectionTypes",
+            "apiVersion": "2020-01-13-preview",
+            "name": "[concat(parameters('automationAccounts_name'), '/AzureClassicCertificate')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccounts_name'))]"
+            ],
+            "properties": {
+                "isGlobal": true,
+                "fieldDefinitions": {
+                    "SubscriptionName": {
+                        "isEncrypted": false,
+                        "isOptional": false,
+                        "type": "System.String"
+                    },
+                    "SubscriptionId": {
+                        "isEncrypted": false,
+                        "isOptional": false,
+                        "type": "System.String"
+                    },
+                    "CertificateAssetName": {
+                        "isEncrypted": false,
+                        "isOptional": false,
+                        "type": "System.String"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Automation/automationAccounts/connectionTypes",
+            "apiVersion": "2020-01-13-preview",
+            "name": "[concat(parameters('automationAccounts_name'), '/AzureServicePrincipal')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccounts_name'))]"
+            ],
+            "properties": {
+                "isGlobal": true,
+                "fieldDefinitions": {
+                    "ApplicationId": {
+                        "isEncrypted": false,
+                        "isOptional": false,
+                        "type": "System.String"
+                    },
+                    "TenantId": {
+                        "isEncrypted": false,
+                        "isOptional": false,
+                        "type": "System.String"
+                    },
+                    "CertificateThumbprint": {
+                        "isEncrypted": false,
+                        "isOptional": false,
+                        "type": "System.String"
+                    },
+                    "SubscriptionId": {
+                        "isEncrypted": false,
+                        "isOptional": false,
+                        "type": "System.String"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Automation/automationAccounts/credentials",
+            "apiVersion": "2020-01-13-preview",
+            "name": "[concat(parameters('automationAccounts_name'), '/', parameters('automationAccounts_name'))]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccounts_name'))]"
+            ],
+            "properties": {
+                "userName": "[parameters('AppRegistrationMonitor_AppId')]",
+                "password": "[parameters('AppRegistrationMonitor_Secret_Value')]"
+            }
+        },
+        {
+            "type": "Microsoft.Automation/automationAccounts/jobSchedules",
+            "apiVersion": "2020-01-13-preview",
+            "name": "[concat(parameters('automationAccounts_name'), '/', parameters('IngestScheduleGuid'))]",
+            "dependsOn": [
+            "[resourceId('Microsoft.Automation/automationAccounts/schedules/', parameters('automationAccounts_name'), variables('ingestscheduleName'))]",
+            "[resourceId('Microsoft.Automation/automationAccounts/runbooks/', parameters('automationAccounts_name'), variables('runbooks').omsASRMonitoring.name)]",
+            "[resourceId('Microsoft.Automation/automationAccounts/', parameters('automationAccounts_name'))]"
+            ],
+            "properties": {
+                "runbook": {
+                    "name": "[variables('Runbooks').omsASRMonitoring.name]"
+                },
+                "schedule": {
+                    "name": "every day at midnight"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Automation/automationAccounts/runbooks",
+            "apiVersion": "2019-06-01",
+            "name": "[concat(parameters('automationAccounts_name'), '/', parameters('automationAccounts_script_name'))]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccounts_name'))]"
+            ],
+            "properties": {
+                "runbookType": "PowerShell",
+                "logVerbose": false,
+                "logProgress": false,
+                "logActivityTrace": 0 ,
+                "publishContentLink": {
+                  "uri": "[variables('runbookUri')]"       
+            }
+          }
+        },
+        {
+            "type": "Microsoft.Automation/automationAccounts/schedules",
+            "apiVersion": "2020-01-13-preview",
+            "name": "[concat(parameters('automationAccounts_name'), '/', variables('ingestscheduleName'))]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Automation/automationAccounts/', parameters('automationAccounts_name'))]",
+                "[resourceId('Microsoft.Automation/automationAccounts/runbooks/', parameters('automationAccounts_name'), variables('runbooks').omsASRMonitoring.name)]"
+            ],
+            "properties": {
+                "startTime": "2022-06-28T00:00:00+03:00",
+                "expiryTime": "9999-12-31T23:59:59.9999999+00:00",
+                "interval": 1,
+                "frequency": "Day",
+                "timeZone": "Asia/Jerusalem"
+            }
+        },
+        {
+            "type": "Microsoft.Automation/automationAccounts/variables",
+            "apiVersion": "2020-01-13-preview",
+            "name": "[concat(parameters('automationAccounts_name'), '/', '/LogAnalyticsPrimaryKey')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccounts_name'))]"
+            ],
+            "properties": {
+                "isEncrypted": true,
+                "value": "[concat('\"', parameters('LogAnalyticsPrimaryKey'), '\"')]"
+            }
+        },
+        {
+            "type": "Microsoft.Automation/automationAccounts/variables",
+            "apiVersion": "2020-01-13-preview",
+            "name": "[concat(parameters('automationAccounts_name'), '/LogAnalyticsWorkspaceID')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccounts_name'))]"
+            ],
+            "properties": {
+                "isEncrypted": false,
+                "value": "[concat('\"', parameters('LogAnalyticsWorkspaceID'), '\"')]"
+            }
+        },
+        {
+            "type": "Microsoft.Automation/automationAccounts/variables",
+            "apiVersion": "2020-01-13-preview",
+            "name": "[concat(parameters('automationAccounts_name'), '/MonitoredTenantID')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccounts_name'))]"
+            ],
+            "properties": {
+                "isEncrypted": false,
+                "value": "[concat('\"', parameters('MonitoredTenantID'), '\"')]"
+            }
+        }
+    ]
+}
